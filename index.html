@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Data Visualization</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        /* Simple overlay for the login screen matching Image A */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 999; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        #container { display: none; } /* Hide 3D scene until login */
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <h1>Welcome Back</h1>
+        <p>Sign in to view the visualization</p>
+        <div id="g_id_onload"
+            data-client_id="981394682348-d2cnajh4184trk55o1cchga21sfejh3a.apps.googleusercontent.com"
+            data-callback="handleCredentialResponse"
+            data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin" data-type="standard" data-size="large"></div>
+    </div>
+
+    <div id="container"></div>
+    
+    <div id="menu">
+        <button id="table">TABLE</button>
+        <button id="sphere">SPHERE</button>
+        <button id="helix">HELIX</button>
+        <button id="grid">GRID</button>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { TWEEN } from 'three/addons/libs/tween.module.min.js';
+        import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
+        import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+
+        // Make these available globally for the Google callback
+        window.THREE = THREE;
+        window.TWEEN = TWEEN;
+        window.CSS3DObject = CSS3DObject;
+        
+        // Initialize the app after this script runs...
+        import { initVisualization } from './app.js';
+        window.initVisualization = initVisualization;
+    </script>
+
+    <script>
+        // GOOGLE LOGIN CALLBACK
+        function handleCredentialResponse(response) {
+            console.log("Encoded JWT ID token: " + response.credential);
+            // Validate token here if you have a backend, or trust it for client-side demo
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('container').style.display = 'block';
+            
+            // Trigger the main 3D load
+            window.initVisualization(); 
+        }
+    </script>
+</body>
+</html>
