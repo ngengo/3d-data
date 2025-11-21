@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-// FIX: Removed ".min" because the minified file does not exist in this version's folder
+// FIX: Using the correct non-minified file
 import TWEEN from 'three/addons/libs/tween.module.js';
 import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
@@ -8,41 +8,60 @@ let camera, scene, renderer, controls;
 const objects = [];
 const targets = { table: [], sphere: [], helix: [], grid: [] };
 
-// --- CONFIGURATION ---
-// Your exact Spreadsheet ID
-const SPREADSHEET_ID = '1f90jkdcZBug3EA6JvLqCZI3USNBAbI-eO3iI5nFkB60'; 
-// Your exact API Key
-const API_KEY = 'AIzaSyBy3qUjO7CiQ-9F0jEvXcnFdS_8HaESMeA';
-
 export function initVisualization() {
-    console.log("Starting Visualization...");
-    fetchSheetData();
+    console.log("Starting Local CSV Visualization...");
+    loadLocalCSV();
 }
 
-function fetchSheetData() {
-    // Requesting data from Sheet1
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Sheet1!A2:F?key=${API_KEY}`;
-
-    fetch(url)
+function loadLocalCSV() {
+    // Fetch the local file "data.csv"
+    fetch('./data.csv')
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Error ${response.status}: Check API Key or Permissions`);
+                throw new Error("Could not find data.csv. Did you move it to the project folder?");
             }
-            return response.json();
+            return response.text(); // Read as text, not JSON
         })
-        .then(data => {
-            if (data.values && data.values.length > 0) {
-                console.log("Data loaded:", data.values.length, "rows");
-                initThreeJS(data.values);
+        .then(csvText => {
+            const tableData = parseCSV(csvText);
+            console.log("Loaded rows:", tableData.length);
+            if (tableData.length > 0) {
+                initThreeJS(tableData);
                 animate();
             } else {
-                alert("Google Sheet is empty or could not be read.\nCheck Console (F12) for details.");
+                alert("data.csv appears empty.");
             }
         })
         .catch(err => {
             console.error(err);
-            alert("Failed to load data.\n1. Check Internet\n2. Check API Key\n3. Open Console (F12) for red error text.");
+            alert("Error loading data.csv:\n" + err.message);
         });
+}
+
+// HELPER: specific parser to handle commas inside quotes (like "$250,000")
+function parseCSV(text) {
+    const rows = [];
+    // Split by new lines
+    const lines = text.split(/\r\n|\n/);
+    
+    // Skip header row (i=1 instead of 0)
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "") continue;
+
+        // Regex to match comma-separated values while respecting quotes
+        const regex = /(?:^|,)(?:"([^"]*)"|([^",]*))/g;
+        const row = [];
+        let match;
+        
+        while ((match = regex.exec(line)) !== null) {
+            // Use the quoted group (1) or the unquoted group (2)
+            let val = match[1] || match[2] || "";
+            row.push(val.trim());
+        }
+        rows.push(row);
+    }
+    return rows;
 }
 
 function initThreeJS(tableData) {
@@ -55,13 +74,13 @@ function initThreeJS(tableData) {
     for (let i = 0; i < tableData.length; i++) {
         const row = tableData[i];
         
-        // Mapping based on your "Data Template" structure
+        // CSV Mapping: 
         // [0]Name, [1]Photo, [2]Age, [3]Country, [4]Interest, [5]Net Worth
         const name = row[0] || "Unknown";
         const photoUrl = row[1] || ""; 
         const netWorthStr = row[5] || "$0"; 
 
-        // Clean net worth string for coloring
+        // Clean net worth string ($250,000 -> 250000)
         const netWorthVal = parseInt(netWorthStr.replace(/[^0-9.-]+/g,"")) || 0;
 
         const element = document.createElement('div');
@@ -76,7 +95,6 @@ function initThreeJS(tableData) {
         }
         element.style.backgroundColor = bgColor;
 
-        // HTML Structure (Photo + Name + Net Worth)
         element.innerHTML = `
             <div class="number">${i + 1}</div>
             <img src="${photoUrl}" class="profile-img" onerror="this.style.display='none'">
@@ -119,7 +137,7 @@ function initThreeJS(tableData) {
     // Helix (Double)
     for (let i = 0, l = objects.length; i < l; i++) {
         let theta = i * 0.175 + Math.PI; 
-        if (i % 2 === 1) theta += Math.PI; // Double Helix Logic
+        if (i % 2 === 1) theta += Math.PI; 
         const y = -(i * 8) + 450; 
         const object = new THREE.Object3D();
         object.position.setFromCylindricalCoords(900, theta, y);
