@@ -83,7 +83,6 @@
             color: rgba(255,255,255,0.7);
         }
 
-        /* LOGIN OVERLAY */
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 999; display: flex;
@@ -135,11 +134,9 @@
         const objects = [];
         const targets = { table: [], sphere: [], helix: [], grid: [] };
 
-        // --- YOUR CONFIGURATION ---
         const SPREADSHEET_ID = '1f90jkdcZBug3EA6JvLqCZI3USNBAbI-eO3iI5nFkB60'; 
         const API_KEY = 'AIzaSyBy3qUjO7CiQ-9F0jEvXcnFdS_8HaESMeA';
 
-        // EXPOSE FUNCTION TO WINDOW FOR LOGIN CALLBACK
         window.initVisualization = function() {
             console.log("Login successful. Fetching data...");
             fetchSheetData();
@@ -176,7 +173,6 @@
 
             scene = new THREE.Scene();
 
-            // --- CREATE OBJECTS ---
             for (let i = 0; i < tableData.length; i++) {
                 const row = tableData[i];
                 
@@ -211,8 +207,7 @@
                 objects.push(object);
             }
 
-            // --- LAYOUTS ---
-            // Table
+
             for (let i = 0; i < objects.length; i++) {
                 const object = new THREE.Object3D();
                 object.position.x = (i % 20) * 140 - 1330; 
@@ -220,7 +215,6 @@
                 targets.table.push(object);
             }
 
-            // Sphere
             const vector = new THREE.Vector3();
             for (let i = 0, l = objects.length; i < l; i++) {
                 const phi = Math.acos(-1 + (2 * i) / l);
@@ -232,36 +226,25 @@
                 targets.sphere.push(object);
             }
 
-            // Helix (Double)
-// Helix (Double) - "DNA Ladder" Style
             for (let i = 0, l = objects.length; i < l; i++) {
-                // 1. Create "Rungs": Pair up items (0&1, 2&3, etc.)
-                // Math.floor(i / 2) means item 0 and 1 both get index 0. Item 2 and 3 get index 1.
                 const row = Math.floor(i / 2); 
-
-                // 2. Set Angle (Theta)
-                // Both items in the pair get the same base angle, but we add 180 degrees (Math.PI) to the second one.
                 let theta = row * 0.2 + Math.PI; 
                 if (i % 2 === 1) {
                     theta += Math.PI; 
                 }
 
-                // 3. Set Height (Y)
-                // We use the 'row' to determine height, so partners stay at the same level.
-                // Multiplied by 30 to give slightly more breathing room than before.
                 const y = - (row * 30) + 450;
 
                 const object = new THREE.Object3D();
                 object.position.setFromCylindricalCoords(900, theta, y);
 
-                // 4. Look at Center (Standard Three.js orientation)
                 vector.x = object.position.x * 2;
                 vector.y = object.position.y;
                 vector.z = object.position.z * 2;
                 object.lookAt(vector);
                 targets.helix.push(object);
             }
-            // Grid
+
             for (let i = 0; i < objects.length; i++) {
                 const object = new THREE.Object3D();
                 object.position.x = ((i % 5) * 400) - 800;
@@ -270,7 +253,7 @@
                 targets.grid.push(object);
             }
 
-            // --- RENDERER ---
+
             renderer = new CSS3DRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
@@ -280,7 +263,7 @@
             controls.maxDistance = 6000;
             controls.addEventListener('change', render);
 
-            // Buttons
+
             document.getElementById('table').addEventListener('click', () => transform(targets.table, 2000));
             document.getElementById('sphere').addEventListener('click', () => transform(targets.sphere, 2000));
             document.getElementById('helix').addEventListener('click', () => transform(targets.helix, 2000));
@@ -341,4 +324,5 @@
         }
     </script>
 </body>
+
 </html>
