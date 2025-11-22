@@ -4,25 +4,103 @@
     <title>3D Data Visualization</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <link type="text/css" rel="stylesheet" href="main.css">
     <style>
-        /* Simple overlay for the login screen matching Image A */
+        /* --- CSS STYLES --- */
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: Helvetica, sans-serif;
+            overflow: hidden;
+        }
+        #menu {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+        }
+        button {
+            color: rgba(127,255,255,0.75);
+            background: transparent;
+            outline: 1px solid rgba(127,255,255,0.75);
+            border: 0px;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover { background-color: rgba(0,255,255,0.5); }
+        button:active { color: #000000; background-color: rgba(0,255,255,0.75); }
+
+        .element {
+            width: 120px;
+            height: 160px;
+            box-shadow: 0px 0px 12px rgba(0,255,255,0.5);
+            border: 1px solid rgba(127,255,255,0.25);
+            text-align: center;
+            cursor: default;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.5s; 
+        }
+        .element:hover {
+            box-shadow: 0px 0px 12px rgba(0,255,255,0.75);
+            border: 1px solid rgba(127,255,255,0.75);
+            z-index: 10;
+        }
+        .element .number {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.5);
+        }
+        .element .profile-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-top: 25px;
+            border: 2px solid rgba(255,255,255,0.2);
+            background-color: #333;
+        }
+        .element .details {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+        }
+        .element .name {
+            font-size: 12px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .element .networth {
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        /* LOGIN OVERLAY */
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 999; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
+            flex-direction: column; align-items: center; justify-content: center; color: black;
         }
-        #container { display: none; } /* Hide 3D scene until login */
+        #container { display: none; } 
     </style>
 </head>
 <body>
+
     <div id="login-overlay">
         <h1>Welcome Back</h1>
         <p>Sign in to view the visualization</p>
         <div id="g_id_onload"
-            data-client_id="981394682348-d2cnajh4184trk55o1cchga21sfejh3a.apps.googleusercontent.com"
-            data-callback="handleCredentialResponse"
-            data-auto_prompt="false">
+             data-client_id="981394682348-d2cnajh4184trk55o1cchga21sfejh3a.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
         </div>
         <div class="g_id_signin" data-type="standard" data-size="large"></div>
     </div>
@@ -37,6 +115,7 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <script type="importmap">
         {
             "imports": {
@@ -48,30 +127,217 @@
 
     <script type="module">
         import * as THREE from 'three';
-        import { TWEEN } from 'three/addons/libs/tween.module.min.js';
+        import TWEEN from 'three/addons/libs/tween.module.js';
         import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
         import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 
-        // Make these available globally for the Google callback
-        window.THREE = THREE;
-        window.TWEEN = TWEEN;
-        window.CSS3DObject = CSS3DObject;
-        
-        // Initialize the app after this script runs...
-        import { initVisualization } from './app.js';
-        window.initVisualization = initVisualization;
+        let camera, scene, renderer, controls;
+        const objects = [];
+        const targets = { table: [], sphere: [], helix: [], grid: [] };
+
+        // --- YOUR CONFIGURATION ---
+        const SPREADSHEET_ID = '1f90jkdcZBug3EA6JvLqCZI3USNBAbI-eO3iI5nFkB60'; 
+        const API_KEY = 'AIzaSyBy3qUjO7CiQ-9F0jEvXcnFdS_8HaESMeA';
+
+        // EXPOSE FUNCTION TO WINDOW FOR LOGIN CALLBACK
+        window.initVisualization = function() {
+            console.log("Login successful. Fetching data...");
+            fetchSheetData();
+        };
+
+        function fetchSheetData() {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Sheet1!A2:F?key=${API_KEY}`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Google API Error: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.values && data.values.length > 0) {
+                        console.log(`Loaded ${data.values.length} rows from Sheet1`);
+                        initThreeJS(data.values);
+                        animate();
+                    } else {
+                        alert("Connected to Google Sheet, but found no data.\nCheck that the tab is named 'Sheet1' and has data.");
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Data Load Error:\n" + err.message);
+                });
+        }
+
+        function initThreeJS(tableData) {
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 3000;
+
+            scene = new THREE.Scene();
+
+            // --- CREATE OBJECTS ---
+            for (let i = 0; i < tableData.length; i++) {
+                const row = tableData[i];
+                
+                const name = row[0] || "Unknown";
+                const photoUrl = row[1] || ""; 
+                const netWorthStr = row[5] || "$0"; 
+                const netWorthVal = parseInt(netWorthStr.replace(/[^0-9.-]+/g,"")) || 0;
+
+                const element = document.createElement('div');
+                element.className = 'element';
+                
+                let bgColor = 'rgba(255,0,0,0.85)'; // Red
+                if (netWorthVal > 200000) bgColor = 'rgba(0,128,0,0.85)'; // Green
+                else if (netWorthVal > 100000) bgColor = 'rgba(255,165,0,0.85)'; // Orange
+                
+                element.style.backgroundColor = bgColor;
+
+                element.innerHTML = `
+                    <div class="number">${i + 1}</div>
+                    <img src="${photoUrl}" class="profile-img" onerror="this.style.display='none'">
+                    <div class="details">
+                        <div class="name">${name}</div>
+                        <div class="networth">${netWorthStr}</div>
+                    </div>
+                `;
+
+                const object = new CSS3DObject(element);
+                object.position.x = Math.random() * 4000 - 2000;
+                object.position.y = Math.random() * 4000 - 2000;
+                object.position.z = Math.random() * 4000 - 2000;
+                scene.add(object);
+                objects.push(object);
+            }
+
+            // --- LAYOUTS ---
+            // Table
+            for (let i = 0; i < objects.length; i++) {
+                const object = new THREE.Object3D();
+                object.position.x = (i % 20) * 140 - 1330; 
+                object.position.y = - (Math.floor(i / 20) * 180) + 990;
+                targets.table.push(object);
+            }
+
+            // Sphere
+            const vector = new THREE.Vector3();
+            for (let i = 0, l = objects.length; i < l; i++) {
+                const phi = Math.acos(-1 + (2 * i) / l);
+                const theta = Math.sqrt(l * Math.PI) * phi;
+                const object = new THREE.Object3D();
+                object.position.setFromSphericalCoords(800, phi, theta);
+                vector.copy(object.position).multiplyScalar(2);
+                object.lookAt(vector);
+                targets.sphere.push(object);
+            }
+
+            // Helix (Double)
+// Helix (Double) - "DNA Ladder" Style
+            for (let i = 0, l = objects.length; i < l; i++) {
+                // 1. Create "Rungs": Pair up items (0&1, 2&3, etc.)
+                // Math.floor(i / 2) means item 0 and 1 both get index 0. Item 2 and 3 get index 1.
+                const row = Math.floor(i / 2); 
+
+                // 2. Set Angle (Theta)
+                // Both items in the pair get the same base angle, but we add 180 degrees (Math.PI) to the second one.
+                let theta = row * 0.2 + Math.PI; 
+                if (i % 2 === 1) {
+                    theta += Math.PI; 
+                }
+
+                // 3. Set Height (Y)
+                // We use the 'row' to determine height, so partners stay at the same level.
+                // Multiplied by 30 to give slightly more breathing room than before.
+                const y = - (row * 30) + 450;
+
+                const object = new THREE.Object3D();
+                object.position.setFromCylindricalCoords(900, theta, y);
+
+                // 4. Look at Center (Standard Three.js orientation)
+                vector.x = object.position.x * 2;
+                vector.y = object.position.y;
+                vector.z = object.position.z * 2;
+                object.lookAt(vector);
+                targets.helix.push(object);
+            }
+            // Grid
+            for (let i = 0; i < objects.length; i++) {
+                const object = new THREE.Object3D();
+                object.position.x = ((i % 5) * 400) - 800;
+                object.position.y = (-(Math.floor(i / 5) % 4) * 400) + 800;
+                object.position.z = (Math.floor(i / 20)) * 1000 - 2000;
+                targets.grid.push(object);
+            }
+
+            // --- RENDERER ---
+            renderer = new CSS3DRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            controls = new TrackballControls(camera, renderer.domElement);
+            controls.minDistance = 500;
+            controls.maxDistance = 6000;
+            controls.addEventListener('change', render);
+
+            // Buttons
+            document.getElementById('table').addEventListener('click', () => transform(targets.table, 2000));
+            document.getElementById('sphere').addEventListener('click', () => transform(targets.sphere, 2000));
+            document.getElementById('helix').addEventListener('click', () => transform(targets.helix, 2000));
+            document.getElementById('grid').addEventListener('click', () => transform(targets.grid, 2000));
+
+            transform(targets.table, 2000);
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function transform(targets, duration) {
+            TWEEN.removeAll();
+            for (let i = 0; i < objects.length; i++) {
+                const object = objects[i];
+                const target = targets[i];
+                new TWEEN.Tween(object.position)
+                    .to({ x: target.position.x, y: target.position.y, z: target.position.z }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+                new TWEEN.Tween(object.rotation)
+                    .to({ x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+            }
+            new TWEEN.Tween(this)
+                .to({}, duration * 2)
+                .onUpdate(render)
+                .start();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+        }
+        function render() {
+            renderer.render(scene, camera);
+        }
     </script>
 
     <script>
-        // GOOGLE LOGIN CALLBACK
         function handleCredentialResponse(response) {
-            console.log("Encoded JWT ID token: " + response.credential);
-            // Validate token here if you have a backend, or trust it for client-side demo
+            // Hide login, show container
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('container').style.display = 'block';
             
-            // Trigger the main 3D load
-            window.initVisualization(); 
+            // Trigger the exposed init function
+            if (window.initVisualization) {
+                window.initVisualization();
+            } else {
+                console.error("initVisualization not found. Is the module loaded?");
+            }
         }
     </script>
 </body>
